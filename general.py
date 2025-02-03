@@ -92,15 +92,8 @@ def postprocess(feature_map, scale=2):
     feature_map = feature_map.reshape((360, 640))
     feature_map = feature_map.astype(np.uint8)
     ret, heatmap = cv2.threshold(feature_map, 127, 255, cv2.THRESH_BINARY)
-    # circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2,
-    #                            maxRadius=7)
-    circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, 
-                              dp=1, 
-                              minDist=1,
-                              param1=50, 
-                              param2=2,
-                              minRadius=4,    # Minimum radius for handball
-                              maxRadius=12)   # Maximum radius for handball
+    circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2,
+                               maxRadius=7)
     x,y = None, None
     if circles is not None:
         if len(circles) == 1:

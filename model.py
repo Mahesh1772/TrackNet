@@ -14,17 +14,9 @@ class ConvBlock(nn.Module):
         return self.block(x)
 
 class BallTrackerNet(nn.Module):
-    def __init__(self):
+    def __init__(self, out_channels=256):
         super().__init__()
-        # Original tennis parameters
-        # self.ball_size = 5
-        # self.detection_threshold = 128
-        
-        # New handball parameters
-        self.ball_size = 15          # Handball is ~3x larger than tennis ball
-        self.detection_threshold = 150  # Higher threshold due to better visibility
-        
-        self.out_channels = 256
+        self.out_channels = out_channels
 
         self.conv1 = ConvBlock(in_channels=9, out_channels=64)
         self.conv2 = ConvBlock(in_channels=64, out_channels=64)
