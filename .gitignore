@@ -3158,3 +3158,5 @@ datasets/trackNet/handball/game1/Clip5/0365.jpg
 datasets/trackNet/handball/game1/Clip5/0366.jpg
 datasets/trackNet/handball/game1/Clip5/0367.jpg
 datasets/trackNet/handball/game1/Clip5/Label.csv
+*.jpg
+*.csv
