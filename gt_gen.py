@@ -72,10 +72,9 @@ def create_gt_labels(path_input, path_output, train_rate=0.7):
 
 
 if __name__ == '__main__':
-    # Original tennis parameters
-    # SIZE = 20        # Original tennis ball size
-    # VARIANCE = 10    # Original gaussian spread
-    # WIDTH = 1280     # Original resolution
+    # SIZE = 20
+    # VARIANCE = 10
+    # WIDTH = 1280
     # HEIGHT = 720   
 
     # New handball parameters

@@ -10,20 +10,6 @@ import argparse
 
 
 def create_features(path_dataset, num_frames):
-    # Original tennis movement thresholds
-    # VELOCITY_THRESHOLD = 20      # Tennis ball moves faster
-    # ACCELERATION_THRESHOLD = 5   # Quick direction changes in tennis
-    
-    # New handball movement thresholds
-    VELOCITY_THRESHOLD = 30      # Higher threshold for larger movements
-    ACCELERATION_THRESHOLD = 8   # Adjusted for handball throwing/catching
-    
-    # Original tennis event window
-    # EVENT_WINDOW = 3  # Tennis bounces are quick
-    
-    # New handball event window
-    EVENT_WINDOW = 5    # Longer window for handball events (catches/throws)
-    
     games = os.listdir(path_dataset)
     games.remove('Readme.docx')
     df = pd.DataFrame()

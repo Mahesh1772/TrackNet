@@ -38,10 +38,8 @@ def infer_model(frames, model):
         ball_track: list of detected ball points
         dists: list of euclidean distances between two neighbouring ball points
     """
-    # New handball dimensions (higher resolution needed for larger ball)
-    height = 540
-    width = 960
-    
+    height = 360
+    width = 640
     dists = [-1]*2
     ball_track = [(None,None)]*2
     for num in tqdm(range(2, len(frames))):
@@ -94,11 +92,6 @@ def split_track(ball_track, max_gap=4, max_dist_gap=80, min_track=5):
     :return
         result: list of subtrack indexes    
     """
-    # New handball tracking parameters (adjusted for slower but larger movements)
-    max_gap = 6         # Longer gap allowed for slower ball
-    max_dist_gap = 120  # Larger distance due to bigger movements
-    min_track = 7       # Longer minimum track for stability
-
     list_det = [0 if x[0] else 1 for x in ball_track]
     groups = [(k, sum(1 for _ in g)) for k, g in groupby(list_det)]
 
@@ -138,7 +131,7 @@ def interpolation(coords):
     track = [*zip(x,y)]
     return track
 
-def write_track(frames, ball_track, path_output_video, fps, trace=10):
+def write_track(frames, ball_track, path_output_video, fps, trace=7):
     """ Write .avi file with detected ball tracks
     :params
         frames: list of original video frames
@@ -147,9 +140,6 @@ def write_track(frames, ball_track, path_output_video, fps, trace=10):
         fps: frames per second
         trace: number of frames with detected trace
     """
-    radius = 3          # Adjusted for better visibility
-    thickness = 12      # Thicker circle for better visibility
-
     height, width = frames[0].shape[:2]
     out = cv2.VideoWriter(path_output_video, cv2.VideoWriter_fourcc(*'DIVX'), 
                           fps, (width, height))
@@ -160,7 +150,7 @@ def write_track(frames, ball_track, path_output_video, fps, trace=10):
                 if ball_track[num-i][0]:
                     x = int(ball_track[num-i][0])
                     y = int(ball_track[num-i][1])
-                    frame = cv2.circle(frame, (x, y), radius=radius, color=(0, 0, 255), thickness=thickness-i)
+                    frame = cv2.circle(frame, (x,y), radius=0, color=(0, 0, 255), thickness=10-i)
                 else:
                     break
         out.write(frame) 
@@ -194,4 +184,8 @@ if __name__ == '__main__':
             ball_track[r[0]:r[1]] = ball_subtrack
         
     write_track(frames, ball_track, args.video_out_path, fps)    
+    
+    
+    
+    
     
