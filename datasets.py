@@ -9,10 +9,21 @@ class trackNetDataset(Dataset):
     def __init__(self, mode, input_height=360, input_width=640):
         self.path_dataset = './datasets/trackNet'
         assert mode in ['train', 'val'], 'incorrect mode'
+        
+        # Load only Clip 4 data
         self.data = pd.read_csv(os.path.join(self.path_dataset, 'labels_{}.csv'.format(mode)))
+        self.data = self.data[self.data['path1'].str.contains('Clip4')]
+        
         print('mode = {}, samples = {}'.format(mode, self.data.shape[0]))         
         self.height = input_height
         self.width = input_width
+        
+        # New handball dimensions (higher resolution needed for larger ball)
+        self.resize_height = 540
+        self.resize_width = 960
+        
+        # New handball sequence length (2 frames sufficient for slower ball)
+        self.sequence_length = 2
         
     def __len__(self):
         return self.data.shape[0]
@@ -30,6 +41,10 @@ class trackNetDataset(Dataset):
         
         inputs = self.get_input(path, path_prev, path_preprev)
         outputs = self.get_output(path_gt)
+        
+        # New handball normalization (adjusted for indoor lighting conditions)
+        mean = [0.5, 0.5, 0.5]
+        std = [0.25, 0.25, 0.25]
         
         return inputs, outputs, x, y, vis
     

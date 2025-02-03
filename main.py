@@ -10,10 +10,22 @@ import argparse
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=2, help='batch size')
+    
+    # Original tennis training parameters
+    # parser.add_argument('--batch_size', type=int, default=2)
+    # parser.add_argument('--num_epochs', type=int, default=50)
+    # parser.add_argument('--lr', type=float, default=0.01)
+    
+    # New handball training parameters (larger batch size, more epochs, adjusted learning rate)
+    parser.add_argument('--batch_size', type=int, default=4)  # Larger due to more stable features
+    parser.add_argument('--num_epochs', type=int, default=100)  # More epochs for better convergence
+    parser.add_argument('--lr', type=float, default=0.001)  # Lower learning rate for stability
+    
+    # Additional handball-specific parameters
+    parser.add_argument('--ball_size', type=int, default=15)  # Handball size parameter
+    parser.add_argument('--sequence_length', type=int, default=2)  # Reduced from 3 frames
+    
     parser.add_argument('--exp_id', type=str, default='default', help='path to saving results')
-    parser.add_argument('--num_epochs', type=int, default=500, help='total training epochs')
-    parser.add_argument('--lr', type=float, default=1.0, help='learning rate')
     parser.add_argument('--val_intervals', type=int, default=5, help='number of epochs to run validation')
     parser.add_argument('--steps_per_epoch', type=int, default=200, help='number of steps per one epoch')
     args = parser.parse_args()

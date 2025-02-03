@@ -99,13 +99,13 @@ def postprocess(feature_map, scale=2):
                               minDist=1,
                               param1=50, 
                               param2=2,
-                              minRadius=4,    # Minimum radius for handball
-                              maxRadius=12)   # Maximum radius for handball
-    x,y = None, None
+                              minRadius=3,    # Adjusted for smaller ball
+                              maxRadius=10)   # Adjusted for smaller ball
+    x, y = None, None
     if circles is not None:
         if len(circles) == 1:
-            x = circles[0][0][0]*scale
-            y = circles[0][0][1]*scale
+            x = circles[0][0][0] * scale
+            y = circles[0][0][1] * scale
     return x, y
 
 
