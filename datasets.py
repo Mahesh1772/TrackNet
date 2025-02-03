@@ -7,40 +7,14 @@ import numpy as np
 
 class trackNetDataset(Dataset):
     def __init__(self, mode, input_height=360, input_width=640):
-        self.path_dataset = './Dataset'  # Update this to your dataset's base directory
+        self.path_dataset = './datasets/trackNet'
         assert mode in ['train', 'val'], 'incorrect mode'
         
-        # Initialize a list to store all data
-        data_list = []
+        # Load only Clip 4 data
+        self.data = pd.read_csv(os.path.join(self.path_dataset, 'labels_{}.csv'.format(mode)))
+        self.data = self.data[self.data['path1'].str.contains('Clip4')]
         
-        # Check if the base dataset directory exists
-        if not os.path.exists(self.path_dataset):
-            raise FileNotFoundError(f"The dataset directory {self.path_dataset} does not exist.")
-        
-        # Iterate over each game directory
-        for game_id in range(1, 11):
-            game_path = os.path.join(self.path_dataset, f'game{game_id}')
-            if not os.path.exists(game_path):
-                print(f"Game directory {game_path} does not exist. Skipping.")
-                continue
-            
-            clips = os.listdir(game_path)
-            
-            # Iterate over each clip directory
-            for clip in clips:
-                clip_path = os.path.join(game_path, clip)
-                label_file = os.path.join(clip_path, 'Label.csv')
-                
-                if os.path.exists(label_file):
-                    labels = pd.read_csv(label_file)
-                    # Add additional columns for paths if needed
-                    labels['path'] = clip_path
-                    data_list.append(labels)
-        
-        # Concatenate all DataFrames in the list into a single DataFrame
-        self.data = pd.concat(data_list, ignore_index=True) if data_list else pd.DataFrame()
-        
-        print('mode = {}, samples = {}'.format(mode, self.data.shape[0]))
+        print('mode = {}, samples = {}'.format(mode, self.data.shape[0]))         
         self.height = input_height
         self.width = input_width
         
@@ -55,36 +29,24 @@ class trackNetDataset(Dataset):
         return self.data.shape[0]
     
     def __getitem__(self, idx):
-        # Ensure there are enough frames to form a sequence
-        if idx < 2:
-            raise IndexError("Not enough frames to form a sequence")
-
-        # Get paths for the current frame and the two preceding frames
-        paths = [
-            os.path.join(self.data.loc[idx - 2, 'path'], self.data.loc[idx - 2, 'File Name']),
-            os.path.join(self.data.loc[idx - 1, 'path'], self.data.loc[idx - 1, 'File Name']),
-            os.path.join(self.data.loc[idx, 'path'], self.data.loc[idx, 'File Name'])
-        ]
-
-        # Load and preprocess the images
-        images = []
-        for path in paths:
-            img = cv2.imread(path)
-            img = cv2.resize(img, (self.width, self.height))
-            img = img.astype(np.float32) / 255.0
-            img = np.rollaxis(img, 2, 0)  # Change from HWC to CHW format
-            images.append(img)
-
-        # Stack images to form a sequence
-        sequence = np.stack(images, axis=0)
-
-        # Get labels for the current frame
-        x = self.data.loc[idx, 'X']
-        y = self.data.loc[idx, 'Y']
-        status = self.data.loc[idx, 'Trajectory Pattern']
-        vis = self.data.loc[idx, 'Visibility Class']
-
-        return sequence, x, y, status, vis
+        path, path_prev, path_preprev, path_gt, x, y, status, vis = self.data.loc[idx, :]
+        
+        path = os.path.join(self.path_dataset, path)
+        path_prev = os.path.join(self.path_dataset, path_prev)
+        path_preprev = os.path.join(self.path_dataset, path_preprev)
+        path_gt = os.path.join(self.path_dataset, path_gt)
+        if math.isnan(x):
+            x = -1
+            y = -1
+        
+        inputs = self.get_input(path, path_prev, path_preprev)
+        outputs = self.get_output(path_gt)
+        
+        # New handball normalization (adjusted for indoor lighting conditions)
+        mean = [0.5, 0.5, 0.5]
+        std = [0.25, 0.25, 0.25]
+        
+        return inputs, outputs, x, y, vis
     
     def get_output(self, path_gt):
         img = cv2.imread(path_gt)
