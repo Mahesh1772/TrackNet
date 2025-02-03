@@ -5,27 +5,33 @@ import torch.nn as nn
 import cv2
 from scipy.spatial import distance
 
-def train(model, train_loader, optimizer, device, epoch, max_iters=200):
+def train(model, train_loader, optimizer, device, epoch, steps_per_epoch):
     start_time = time.time()
     losses = []
     criterion = nn.CrossEntropyLoss()
-    for iter_id, batch in enumerate(train_loader):
+    model.train()
+    total_loss = 0
+
+    for batch_idx, (data, x, y, status, vis) in enumerate(train_loader):
+        # Reshape the input to combine the frame sequence into the channel dimension
+        data = data.view(data.size(0), -1, data.size(3), data.size(4))  # [N, 9, H, W]
+
+        data, x, y, status, vis = data.to(device), x.to(device), y.to(device), status.to(device), vis.to(device)
         optimizer.zero_grad()
-        model.train()
-        out = model(batch[0].float().to(device))
-        gt = torch.tensor(batch[1], dtype=torch.long, device=device)
-        loss = criterion(out, gt)
+        output = model(data.float())
+        gt = torch.tensor(y, dtype=torch.long, device=device)
+        loss = criterion(output, gt)
 
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
         end_time = time.time()
         duration = time.strftime("%H:%M:%S", time.gmtime(end_time - start_time))
-        print('train | epoch = {}, iter = [{}|{}], loss = {}, time = {}'.format(epoch, iter_id, max_iters,
+        print('train | epoch = {}, iter = [{}|{}], loss = {}, time = {}'.format(epoch, batch_idx, steps_per_epoch,
                                                                                 round(loss.item(), 6), duration))
         losses.append(loss.item())
         
-        if iter_id > max_iters - 1:
+        if batch_idx > steps_per_epoch - 1:
             break
         
     return np.mean(losses)
