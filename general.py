@@ -44,6 +44,11 @@ def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
             gt = torch.tensor(batch[1], dtype=torch.long, device=device)
             loss = criterion(out, gt)
             losses.append(loss.item())
+            
+            # Debug: Print model output and ground truth
+            print(f"Model output: {out}")
+            print(f"Ground truth: {gt}")
+            
             # metrics
             output = out.argmax(dim=1).detach().cpu().numpy()
             for i in range(len(output)):
@@ -51,16 +56,24 @@ def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
                 x_gt = batch[2][i]
                 y_gt = batch[3][i]
                 vis = batch[4][i]
-                if x_pred:
+                
+                # Debug: Print predictions and ground truth coordinates
+                print(f"x_pred: {x_pred}, y_pred: {y_pred}, x_gt: {x_gt}, y_gt: {y_gt}, vis: {vis}")
+                
+                if x_pred is not None and y_pred is not None:
                     if vis != 0:
-                        dst = distance.euclidean((x_pred, y_pred), (x_gt, y_gt))
+                        if np.isfinite(x_pred) and np.isfinite(y_pred) and np.isfinite(x_gt) and np.isfinite(y_gt):
+                            dst = distance.euclidean((x_pred, y_pred), (x_gt, y_gt))
+                        else:
+                            print(f"Invalid values detected: x_pred={x_pred}, y_pred={y_pred}, x_gt={x_gt}, y_gt={y_gt}")
+                            dst = float('inf')
                         if dst < min_dist:
                             tp[vis] += 1
                         else:
                             fp[vis] += 1
                     else:        
                         fp[vis] += 1
-                if not x_pred:
+                if x_pred is None or y_pred is None:
                     if vis != 0:
                         fn[vis] += 1
                     else:

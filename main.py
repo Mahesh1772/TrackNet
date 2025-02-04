@@ -12,10 +12,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=2, help='batch size')
     parser.add_argument('--exp_id', type=str, default='default', help='path to saving results')
-    parser.add_argument('--num_epochs', type=int, default=20, help='total training epochs') #number of epochs = 300
+    parser.add_argument('--num_epochs', type=int, default=10, help='total training epochs') #number of epochs = 300
     parser.add_argument('--lr', type=float, default=0.8, help='learning rate')
-    parser.add_argument('--val_intervals', type=int, default=5, help='number of epochs to run validation')
-    parser.add_argument('--steps_per_epoch', type=int, default=100, help='number of steps per one epoch') #iterations per epoch = 200
+    parser.add_argument('--val_intervals', type=int, default=2, help='number of epochs to run validation') #number of epochs to run validation = 5
+    parser.add_argument('--steps_per_epoch', type=int, default=50, help='number of steps per one epoch') #iterations per epoch = 200
     args = parser.parse_args()
     
 
@@ -68,4 +68,7 @@ if __name__ == '__main__':
             if f1 > val_best_metric:
                 val_best_metric = f1
                 torch.save(model.state_dict(), model_best_path)           
-            torch.save(model.state_dict(), model_last_path)
+
+        # Save the model after every epoch
+        torch.save(model.state_dict(), model_last_path)
+        print(f'Model saved after epoch {epoch}')
