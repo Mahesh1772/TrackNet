@@ -17,9 +17,9 @@ def create_gaussian(size, variance):
 
 def create_gt_images(path_input, path_output, size, variance, width, height):
     gaussian_kernel_array = create_gaussian(size, variance)
-    for game_id in range(1,11):
+    for game_id in range(1, 11):
         game = 'game{}'.format(game_id)
-        clips = os.listdir(os.path.join(path_input, game))
+        clips = os.listdir(os.path.join(path_input, 'images', game))
         for clip in clips:
             print('game = {}, clip = {}'.format(game, clip))
 
@@ -31,7 +31,7 @@ def create_gt_images(path_input, path_output, size, variance, width, height):
             if not os.path.exists(path_out_clip):
                 os.makedirs(path_out_clip)  
 
-            path_labels = os.path.join(os.path.join(path_input, game, clip), 'Label.csv')
+            path_labels = os.path.join(path_input, 'images', game, clip, 'Label.csv')
             labels = pd.read_csv(path_labels)    
             for idx in range(labels.shape[0]):
                 file_name, vis, x, y, _ = labels.loc[idx, :]
@@ -41,10 +41,10 @@ def create_gt_images(path_input, path_output, size, variance, width, height):
                     y = int(y)
                     for i in range(-size, size+1):
                         for j in range(-size, size+1):
-                                if x+i<width and x+i>=0 and y+j<height and y+j>=0 :
-                                    temp = gaussian_kernel_array[i+size][j+size]
-                                    if temp > 0:
-                                        heatmap[y+j,x+i] = (temp,temp,temp)
+                            if x+i < width and x+i >= 0 and y+j < height and y+j >= 0:
+                                temp = gaussian_kernel_array[i+size][j+size]
+                                if temp > 0:
+                                    heatmap[y+j, x+i] = (temp, temp, temp)
 
                 cv2.imwrite(os.path.join(path_out_clip, file_name), heatmap) 
                 
