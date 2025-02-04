@@ -7,29 +7,22 @@ import numpy as np
         
 class trackNetDataset(Dataset):
     def __init__(self, mode, input_height=360, input_width=640):
-        # Update the path to match your dataset location
-        # self.path_dataset = 'C:/Users/Admin/Documents/Personal_TrackNet/datasets/images'
+        # Hardcode the path to your specific clip
         self.path_dataset = 'C:/Users/Admin/Documents/Personal_TrackNet/datasets/handball'
         assert mode in ['train', 'val'], 'incorrect mode'
         
-        # Initialize an empty DataFrame to store all labels
+        # Initialize DataFrame to store labels
         self.data = pd.DataFrame()
         
-        # Iterate over each game and clip to read the label files
-        for game in os.listdir(self.path_dataset):
-            game_path = os.path.join(self.path_dataset, game)
-            if os.path.isdir(game_path):
-                for clip in os.listdir(game_path):
-                    clip_path = os.path.join(game_path, clip)
-                    if os.path.isdir(clip_path):
-                        label_file = os.path.join(clip_path, 'Label.csv')
-                        if os.path.exists(label_file):
-                            labels = pd.read_csv(label_file)
-                            labels['game'] = game
-                            labels['clip'] = clip
-                            self.data = pd.concat([self.data, labels], ignore_index=True)
-                        else:
-                            print(f"    Label file not found: {label_file}")
+        # Only read the specific clip's label file
+        label_file = os.path.join(self.path_dataset, 'game1', 'Clip4', 'Label.csv')
+        if os.path.exists(label_file):
+            labels = pd.read_csv(label_file)
+            labels['game'] = 'game1'
+            labels['clip'] = 'Clip4'
+            self.data = labels
+        else:
+            print(f"Label file not found: {label_file}")
         
         print('mode = {}, samples = {}'.format(mode, self.data.shape[0]))         
         self.height = input_height
