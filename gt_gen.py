@@ -10,8 +10,12 @@ def gaussian_kernel(size, variance):
     return g
 
 def create_gaussian(size, variance):
-    gaussian_kernel_array = gaussian_kernel(size, variance)
-    gaussian_kernel_array =  gaussian_kernel_array * 255/gaussian_kernel_array[int(len(gaussian_kernel_array)/2)][int(len(gaussian_kernel_array)/2)]
+    #///////////////////CHANGE VARIANCE HERE///////////////////
+    # gaussian_kernel_array = gaussian_kernel(size, variance)
+    # gaussian_kernel_array =  gaussian_kernel_array * 255/gaussian_kernel_array[int(len(gaussian_kernel_array)/2)][int(len(gaussian_kernel_array)/2)]
+    # gaussian_kernel_array = gaussian_kernel_array.astype(int)
+    gaussian_kernel_array = gaussian_kernel(size, 15)
+    gaussian_kernel_array = gaussian_kernel_array * 255/gaussian_kernel_array[int(len(gaussian_kernel_array)/2)][int(len(gaussian_kernel_array)/2)]
     gaussian_kernel_array = gaussian_kernel_array.astype(int)
     return gaussian_kernel_array
 

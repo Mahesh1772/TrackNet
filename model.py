@@ -18,8 +18,8 @@ class BallTrackerNet(nn.Module):
         super().__init__()
         self.out_channels = out_channels
 
-        self.conv1 = ConvBlock(in_channels=9, out_channels=64)
-        self.conv2 = ConvBlock(in_channels=64, out_channels=64)
+        self.conv1 = ConvBlock(in_channels=9, out_channels=72)  # Increased from 64 to 72
+        self.conv2 = ConvBlock(in_channels=72, out_channels=64)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv3 = ConvBlock(in_channels=64, out_channels=128)
         self.conv4 = ConvBlock(in_channels=128, out_channels=128)

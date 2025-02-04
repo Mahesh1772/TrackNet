@@ -8,7 +8,8 @@ import numpy as np
 class trackNetDataset(Dataset):
     def __init__(self, mode, input_height=360, input_width=640):
         # Update the path to match your dataset location
-        self.path_dataset = 'C:/Users/Admin/Documents/Personal_TrackNet/datasets/images'
+        # self.path_dataset = 'C:/Users/Admin/Documents/Personal_TrackNet/datasets/images'
+        self.path_dataset = 'C:/Users/Admin/Documents/Personal_TrackNet/datasets/handball'
         assert mode in ['train', 'val'], 'incorrect mode'
         
         # Initialize an empty DataFrame to store all labels
@@ -39,11 +40,11 @@ class trackNetDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
-        file_name = row['file name']
-        visibility_class = row['visibility']
-        x = row['x-coordinate']
-        y = row['y-coordinate']
-        trajectory_pattern = row['status']
+        file_name = row['File Name']
+        visibility_class = row['Visibility Class']
+        x = row['X']
+        y = row['Y']
+        trajectory_pattern = row['Trajectory Pattern']
         
         game = row['game']
         clip = row['clip']

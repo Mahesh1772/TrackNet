@@ -30,7 +30,7 @@ def train(model, train_loader, optimizer, device, epoch, max_iters=200):
         
     return np.mean(losses)
 
-def validate(model, val_loader, device, epoch, min_dist=5):
+def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
     losses = []
     tp = [0, 0, 0, 0]
     fp = [0, 0, 0, 0]
@@ -92,8 +92,8 @@ def postprocess(feature_map, scale=2):
     feature_map = feature_map.reshape((360, 640))
     feature_map = feature_map.astype(np.uint8)
     ret, heatmap = cv2.threshold(feature_map, 127, 255, cv2.THRESH_BINARY)
-    circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2,
-                               maxRadius=7)
+    # circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2, maxRadius=7)
+    circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=3, maxRadius=10)  # Increased radius range
     x,y = None, None
     if circles is not None:
         if len(circles) == 1:
