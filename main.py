@@ -12,10 +12,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=1, help='batch size')
     parser.add_argument('--exp_id', type=str, default='default', help='path to saving results')
-    parser.add_argument('--num_epochs', type=int, default=10, help='total training epochs') #number of epochs = 300
+    parser.add_argument('--num_epochs', type=int, default=2, help='total training epochs') #number of epochs = 300
     parser.add_argument('--lr', type=float, default=0.8, help='learning rate')
-    parser.add_argument('--val_intervals', type=int, default=2, help='number of epochs to run validation') #number of epochs to run validation = 5
-    parser.add_argument('--steps_per_epoch', type=int, default=50, help='number of steps per one epoch') #iterations per epoch = 200
+    parser.add_argument('--val_intervals', type=int, default=1, help='number of epochs to run validation') #number of epochs to run validation = 5
+    parser.add_argument('--steps_per_epoch', type=int, default=10, help='number of steps per one epoch') #iterations per epoch = 200
     args = parser.parse_args()
     
 

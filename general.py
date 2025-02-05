@@ -4,6 +4,8 @@ import numpy as np
 import torch.nn as nn
 import cv2
 from scipy.spatial import distance
+import os
+import matplotlib.pyplot as plt
 
 def train(model, train_loader, optimizer, device, epoch, max_iters=200):
     start_time = time.time()
@@ -30,7 +32,62 @@ def train(model, train_loader, optimizer, device, epoch, max_iters=200):
         
     return np.mean(losses)
 
-def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
+def visualize_heatmaps(input_frames, gt_heatmap, pred_heatmap, save_path=None):
+    """
+    Visualize input frames, ground truth heatmap and predicted heatmap side by side
+    """
+    # Convert tensors to numpy arrays and reshape if needed
+    frames = input_frames.cpu().numpy()
+    gt = gt_heatmap.cpu().numpy()
+    pred = pred_heatmap.cpu().numpy()
+    
+    # Reshape ground truth if it's flattened (921600 = 720 * 1280)
+    if len(gt.shape) == 1:
+        gt = gt.reshape(720, 1280)
+    elif len(gt.shape) == 2:
+        gt = gt[0].reshape(720, 1280)
+    
+    # Handle prediction shape
+    if len(pred.shape) == 3:
+        # Take the first batch and sum across channels
+        pred = pred[0].sum(axis=0).reshape(720, 1280)
+        # Normalize prediction
+        pred = (pred - pred.min()) / (pred.max() - pred.min() + 1e-8)
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+    
+    # Plot input frames
+    for i in range(3):
+        frame = np.transpose(frames[0, i*3:(i+1)*3], (1, 2, 0))  # Get single frame and convert to HWC
+        axes[0, i].imshow(frame)
+        axes[0, i].set_title(f'Input Frame {i+1}')
+        axes[0, i].axis('off')
+    
+    # Plot ground truth and predicted heatmaps with higher contrast
+    axes[1, 0].imshow(gt, cmap='hot', vmin=0, vmax=255)
+    axes[1, 0].set_title('Ground Truth Heatmap')
+    axes[1, 0].axis('off')
+    
+    axes[1, 1].imshow(pred, cmap='hot', vmin=0, vmax=1)
+    axes[1, 1].set_title('Predicted Heatmap')
+    axes[1, 1].axis('off')
+    
+    # Plot overlay of both heatmaps
+    overlay = np.zeros((*gt.shape, 3))
+    overlay[..., 0] = gt / 255.0  # Red channel for ground truth
+    overlay[..., 1] = pred  # Green channel for prediction
+    axes[1, 2].imshow(overlay)
+    axes[1, 2].set_title('Overlay (GT=Red, Pred=Green)')
+    axes[1, 2].axis('off')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path)
+    plt.close()
+
+def validate(model, val_loader, device, epoch):
     losses = []
     tp = [0, 0, 0]
     fp = [0, 0, 0]
@@ -38,65 +95,73 @@ def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
     fn = [0, 0, 0]
     criterion = nn.CrossEntropyLoss()
     model.eval()
-    for iter_id, batch in enumerate(val_loader):
-        with torch.no_grad():
-            out = model(batch[0].float().to(device))
-            gt = torch.tensor(batch[1], dtype=torch.long, device=device)
+    
+    # Create directory for validation visualizations
+    vis_dir = f'validation_vis_epoch_{epoch}'
+    os.makedirs(vis_dir, exist_ok=True)
+    
+    with torch.no_grad():
+        for iter_id, batch in enumerate(val_loader):
+            inputs = batch[0].float().to(device)
+            # Convert ground truth to proper type and shape
+            gt = batch[1].long().to(device)  # Changed from byte to long
+            
+            # Forward pass
+            out = model(inputs)
+            
+            # Save visualization every 50 iterations
+            if iter_id % 50 == 0:
+                save_path = os.path.join(vis_dir, f'val_iter_{iter_id}.png')
+                visualize_heatmaps(inputs, gt, out, save_path)
+            
+            # Ensure shapes are correct for loss calculation
+            if out.dim() == 3:  # If output is [batch, channels, pixels]
+                out = out.view(out.size(0), out.size(1), -1)  # Reshape to [batch, channels, height*width]
+            if gt.dim() == 1:  # If ground truth is [pixels]
+                gt = gt.view(-1)  # Reshape to [batch*height*width]
+            
             loss = criterion(out, gt)
             losses.append(loss.item())
             
-            # Debug: Print model output and ground truth
-            print(f"Model output: {out}")
-            print(f"Ground truth: {gt}")
+            # Get predictions
+            pred = torch.argmax(out, dim=1)
             
-            # metrics
-            output = out.argmax(dim=1).detach().cpu().numpy()
-            for i in range(len(output)):
-                x_pred, y_pred = postprocess(output[i])
+            # Calculate metrics
+            for i in range(len(pred)):
+                x_pred, y_pred = postprocess(pred[i])
                 x_gt = batch[2][i]
                 y_gt = batch[3][i]
                 vis = batch[4][i]
                 
-                # Debug: Print predictions and ground truth coordinates
-                print(f"x_pred: {x_pred}, y_pred: {y_pred}, x_gt: {x_gt}, y_gt: {y_gt}, vis: {vis}")
-                
                 if x_pred is not None and y_pred is not None:
                     if vis != 0:
-                        if np.isfinite(x_pred) and np.isfinite(y_pred) and np.isfinite(x_gt) and np.isfinite(y_gt):
-                            dst = distance.euclidean((x_pred, y_pred), (x_gt, y_gt))
-                        else:
-                            print(f"Invalid values detected: x_pred={x_pred}, y_pred={y_pred}, x_gt={x_gt}, y_gt={y_gt}")
-                            dst = float('inf')
-                        if dst < min_dist:
+                        dst = distance.euclidean((x_pred, y_pred), (x_gt, y_gt))
+                        if dst < 7:  # min_dist parameter
                             tp[vis] += 1
                         else:
                             fp[vis] += 1
-                    else:        
+                    else:
                         fp[vis] += 1
                 if x_pred is None or y_pred is None:
                     if vis != 0:
                         fn[vis] += 1
                     else:
                         tn[vis] += 1
-            print('val | epoch = {}, iter = [{}|{}], loss = {}, tp = {}, tn = {}, fp = {}, fn = {} '.format(epoch,
-                                                                                                            iter_id,
-                                                                                                            len(val_loader),
-                                                                                                            round(np.mean(losses), 6),
-                                                                                                            sum(tp),
-                                                                                                            sum(tn),
-                                                                                                            sum(fp),
-                                                                                                            sum(fn)))
+                        
+            print('val | epoch = {}, iter = [{}|{}], loss = {}, tp = {}, tn = {}, fp = {}, fn = {} '.format(
+                epoch, iter_id, len(val_loader), round(np.mean(losses), 6), sum(tp), sum(tn), sum(fp), sum(fn)))
+    
     eps = 1e-15
     precision = sum(tp) / (sum(tp) + sum(fp) + eps)
     vc1 = tp[1] + fp[1] + tn[1] + fn[1]
     vc2 = tp[2] + fp[2] + tn[2] + fn[2]
-    #vc3 = tp[3] + fp[3] + tn[3] + fn[3]
-    recall = sum(tp) / (vc1 + vc2 +  eps)
+    recall = sum(tp) / (vc1 + vc2 + eps)
     f1 = 2 * precision * recall / (precision + recall + eps)
+    
     print('precision = {}'.format(precision))
     print('recall = {}'.format(recall))
     print('f1 = {}'.format(f1))
-
+    
     return np.mean(losses), precision, recall, f1
 
 

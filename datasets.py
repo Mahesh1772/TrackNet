@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
         
 class trackNetDataset(Dataset):
     def __init__(self, mode, input_height=720, input_width=1280, sequence_length=3):
-        self.path_dataset = 'C:/Users/Admin/Documents/Personal_Tracknet/datasets/handball'
+        self.path_dataset = 'datasets/handball'
         assert mode in ['train', 'val'], 'incorrect mode'
         
         # Initialize DataFrame to store all labels
