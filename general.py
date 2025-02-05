@@ -90,8 +90,8 @@ def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
     precision = sum(tp) / (sum(tp) + sum(fp) + eps)
     vc1 = tp[1] + fp[1] + tn[1] + fn[1]
     vc2 = tp[2] + fp[2] + tn[2] + fn[2]
-    vc3 = tp[3] + fp[3] + tn[3] + fn[3]
-    recall = sum(tp) / (vc1 + vc2 + vc3 + eps)
+    #vc3 = tp[3] + fp[3] + tn[3] + fn[3]
+    recall = sum(tp) / (vc1 + vc2 +  eps)
     f1 = 2 * precision * recall / (precision + recall + eps)
     print('precision = {}'.format(precision))
     print('recall = {}'.format(recall))
