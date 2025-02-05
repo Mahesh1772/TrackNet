@@ -37,7 +37,7 @@ class TrajectoryLabeler:
             
             # Display frame info
             print(f"\nFrame {self.current_frame:04d}.jpg")
-            print("Controls: 0: Normal Flight | 1: Caught by Player | 2: Thrown/Shot | n: Next frame | p: Previous frame | s: Save progress | q: Save and quit")
+            print("Controls: 0: Free Flight | 1: In Possession | 2: Bounce/Roll | n: Next frame | p: Previous frame | s: Save progress | q: Save and quit")
             
             key = cv2.waitKey(0)
             
@@ -55,22 +55,39 @@ class TrajectoryLabeler:
             elif key in [ord('0'), ord('1'), ord('2')]:  # Set Trajectory Pattern
                 traj_value = int(chr(key))
                 self.df.at[self.current_frame, 'Trajectory Pattern'] = traj_value
-                print(f"Trajectory Pattern set to {traj_value}")
+                print(f"Trajectory Pattern set to {traj_value} - " + 
+                      ("Free Flight" if traj_value == 0 else 
+                       "In Possession" if traj_value == 1 else 
+                       "Bounce/Roll"))
     
     def display_frame(self):
-        """Display current frame"""
+        """Display current frame with ball position and trajectory value"""
         img_copy = self.current_img.copy()
         
         # Display current Trajectory Pattern value
         traj_value = self.df.at[self.current_frame, 'Trajectory Pattern']
-        cv2.putText(img_copy, f'Trajectory: {traj_value}', (10, 30), 
+        traj_text = f"Trajectory: {traj_value} - " + ("Free Flight" if traj_value == 0 else 
+                                                     "In Possession" if traj_value == 1 else 
+                                                     "Bounce/Roll" if traj_value == 2 else 
+                                                     "Unknown")
+        cv2.putText(img_copy, traj_text, (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # Display ball position if coordinates exist
+        x = self.df.at[self.current_frame, 'X']
+        y = self.df.at[self.current_frame, 'Y']
+        if pd.notna(x) and pd.notna(y):
+            # Draw a red circle at ball position
+            cv2.circle(img_copy, (int(x), int(y)), 5, (0, 0, 255), -1)
+            # Display coordinates
+            cv2.putText(img_copy, f'Ball: ({int(x)},{int(y)})', (10, 60),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         
         cv2.imshow(self.window_name, img_copy)
 
 def main():
     # Path to the clip you want to label
-    clip_path = r'C:\Users\Admin\Documents\handball_dataset\game1\Clip4'
+    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip5'
     
     labeler = TrajectoryLabeler(clip_path)
 

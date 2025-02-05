@@ -32,10 +32,10 @@ def train(model, train_loader, optimizer, device, epoch, max_iters=200):
 
 def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
     losses = []
-    tp = [0, 0, 0, 0]
-    fp = [0, 0, 0, 0]
-    tn = [0, 0, 0, 0]
-    fn = [0, 0, 0, 0]
+    tp = [0, 0, 0]
+    fp = [0, 0, 0]
+    tn = [0, 0, 0]
+    fn = [0, 0, 0]
     criterion = nn.CrossEntropyLoss()
     model.eval()
     for iter_id, batch in enumerate(val_loader):
@@ -100,18 +100,38 @@ def validate(model, val_loader, device, epoch, min_dist=7): #Was min_dist=5
     return np.mean(losses), precision, recall, f1
 
 
-def postprocess(feature_map, scale=2):
-    feature_map *= 255
-    feature_map = feature_map.reshape((360, 640))
-    feature_map = feature_map.astype(np.uint8)
-    ret, heatmap = cv2.threshold(feature_map, 127, 255, cv2.THRESH_BINARY)
-    # circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2, maxRadius=7)
-    circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=3, maxRadius=10)  # Increased radius range
-    x,y = None, None
+def postprocess(feature_map):
+    """Process network output to get ball coordinates"""
+    if isinstance(feature_map, torch.Tensor):
+        feature_map = feature_map.cpu().detach().numpy()
+    
+    # Print shape for debugging
+    #print(f"Feature map shape: {feature_map.shape}")
+    
+    # Reshape based on the actual dimensions
+    if len(feature_map.shape) == 1:
+        # If it's a 1D array, calculate height and width
+        total_size = feature_map.shape[0]
+        height = int(np.sqrt(total_size))
+        width = total_size // height
+        feature_map = feature_map.reshape((height, width))
+    elif len(feature_map.shape) == 3:
+        # If it's 3D (channels, height, width), take the first channel
+        feature_map = feature_map[0]
+    
+    # Convert to uint8 for cv2
+    feature_map = ((feature_map - feature_map.min()) * (255 / (feature_map.max() - feature_map.min()))).astype(np.uint8)
+    
+    # Find ball position
+    x, y = -1, -1  # Default values if no ball is found
+    circles = cv2.HoughCircles(feature_map, cv2.HOUGH_GRADIENT, dp=1, minDist=1,
+                             param1=50, param2=2, minRadius=2, maxRadius=7)
+    
     if circles is not None:
-        if len(circles) == 1:
-            x = circles[0][0][0]*scale
-            y = circles[0][0][1]*scale
+        circles = np.round(circles[0, :]).astype(int)
+        if len(circles) > 0:
+            x, y = circles[0][0], circles[0][1]
+    
     return x, y
 
 

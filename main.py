@@ -10,7 +10,7 @@ import argparse
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=2, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=1, help='batch size')
     parser.add_argument('--exp_id', type=str, default='default', help='path to saving results')
     parser.add_argument('--num_epochs', type=int, default=10, help='total training epochs') #number of epochs = 300
     parser.add_argument('--lr', type=float, default=0.8, help='learning rate')

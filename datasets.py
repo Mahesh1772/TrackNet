@@ -7,8 +7,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
         
 class trackNetDataset(Dataset):
-    def __init__(self, mode, input_height=720, input_width=1280, sequence_length=5):
-        self.path_dataset = 'C:/Users/Admin/Documents/handball_dataset'
+    def __init__(self, mode, input_height=720, input_width=1280, sequence_length=3):
+        self.path_dataset = 'C:/Users/Admin/Documents/Personal_Tracknet/datasets/handball'
         assert mode in ['train', 'val'], 'incorrect mode'
         
         # Initialize DataFrame to store all labels
@@ -17,7 +17,7 @@ class trackNetDataset(Dataset):
         # List of clips to load
         clips = [
             ('game1', 'Clip4'),
-            ('game1', 'Clip5')
+            #('game1', 'Clip5')
         ]
         
         # Load all clips
@@ -33,16 +33,21 @@ class trackNetDataset(Dataset):
         
         # Split the combined data into train and validation sets
         if len(self.data) > 0:
+            # Convert any VC=3 to VC=0 (using correct column name)
+            self.data.loc[self.data['Visibility Class'] == 3, 'Visibility Class'] = 0
+            # Verify only valid classes remain
+            assert self.data['Visibility Class'].isin([0, 1, 2]).all(), "Invalid visibility class found"
+            
             train_data, val_data = train_test_split(
                 self.data, 
-                test_size=0.2,  # 80% train, 20% validation
-                random_state=42  # For reproducibility
+                test_size=0.2,
+                random_state=42
             )
             
             # Assign appropriate split based on mode
             if mode == 'train':
                 self.data = train_data
-            else:  # mode == 'val'
+            else:
                 self.data = val_data
                 
             print(f'Mode: {mode}, Total samples: {len(self.data)}')
@@ -67,9 +72,9 @@ class trackNetDataset(Dataset):
         game = row['game']
         clip = row['clip']
         
-        # Load sequence_length previous frames
+        # Load 3 consecutive frames instead of 5
         frames = []
-        for i in range(self.sequence_length):
+        for i in range(self.sequence_length):  # This will now load 3 frames
             prev_frame = int(file_name.split('.')[0]) - i
             path = os.path.join(self.path_dataset, game, clip, f"{prev_frame:04d}.jpg")
             if os.path.exists(path):
@@ -79,7 +84,7 @@ class trackNetDataset(Dataset):
                 img = np.zeros((self.height, self.width, 3), dtype=np.float32)
             frames.append(img)
             
-        # Concatenate all frames
+        # Concatenate frames (3 frames × 3 channels = 9 channels)
         imgs = np.concatenate(frames, axis=2)
         imgs = imgs.astype(np.float32) / 255.0
         imgs = np.rollaxis(imgs, 2, 0)
