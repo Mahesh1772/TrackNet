@@ -66,15 +66,14 @@ class trackNetDataset(Dataset):
         row = self.data.iloc[idx]
         file_name = row['File Name']
         visibility_class = row['Visibility Class']
-        x = row['X']
-        y = row['Y']
+        x, y = row['X'], row['Y']
         
         game = row['game']
         clip = row['clip']
         
-        # Load 3 consecutive frames instead of 5
+        # Load 3 consecutive frames
         frames = []
-        for i in range(self.sequence_length):  # This will now load 3 frames
+        for i in range(self.sequence_length):
             prev_frame = int(file_name.split('.')[0]) - i
             path = os.path.join(self.path_dataset, game, clip, f"{prev_frame:04d}.jpg")
             if os.path.exists(path):
@@ -84,14 +83,41 @@ class trackNetDataset(Dataset):
                 img = np.zeros((self.height, self.width, 3), dtype=np.float32)
             frames.append(img)
             
-        # Concatenate frames (3 frames × 3 channels = 9 channels)
+        # Concatenate frames
         imgs = np.concatenate(frames, axis=2)
         imgs = imgs.astype(np.float32) / 255.0
         imgs = np.rollaxis(imgs, 2, 0)
         
-        outputs = self.get_output(os.path.join(self.path_dataset, game, clip, file_name))
+        # Create ground truth heatmap
+        heatmap = np.zeros((self.height, self.width), dtype=np.float32)
         
-        return imgs, outputs, x, y, visibility_class
+        # Only create Gaussian blob for visible balls
+        if visibility_class > 0 and not np.isnan(x) and not np.isnan(y):
+            # Scale coordinates to match resized dimensions
+            x_scaled = int(x * self.width / 1280)
+            y_scaled = int(y * self.height / 720)
+            
+            # Create Gaussian blob with larger size and spread
+            sigma = 10  # Increased from 2.5 to 10
+            size = 30   # Increased from 15 to 30
+            x_grid, y_grid = np.meshgrid(
+                np.arange(max(0, x_scaled - size), min(self.width, x_scaled + size + 1)) - x_scaled,
+                np.arange(max(0, y_scaled - size), min(self.height, y_scaled + size + 1)) - y_scaled
+            )
+            gaussian = np.exp(-(x_grid**2 + y_grid**2)/(2*sigma**2))
+            
+            # Place Gaussian on heatmap
+            y_start = max(0, y_scaled - size)
+            y_end = min(self.height, y_scaled + size + 1)
+            x_start = max(0, x_scaled - size)
+            x_end = min(self.width, x_scaled + size + 1)
+            
+            heatmap[y_start:y_end, x_start:x_end] = gaussian
+        
+        # Don't threshold the Gaussian - keep the continuous values
+        heatmap = heatmap.reshape(-1)  # Flatten to 1D array
+        
+        return imgs, heatmap, x, y, visibility_class
     
     def get_output(self, path_gt):
         img = cv2.imread(path_gt)

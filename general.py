@@ -32,87 +32,74 @@ def train(model, train_loader, optimizer, device, epoch, max_iters=200):
         
     return np.mean(losses)
 
-def visualize_heatmaps(input_frames, gt_heatmap, pred_heatmap, save_path=None):
+def visualize_heatmaps(input_frames, gt_heatmap, pred_heatmap, save_path=None, num_frames=10):
     """
     Visualize input frames, ground truth heatmap and predicted heatmap side by side
+    for multiple frames
     """
-    # Convert tensors to numpy arrays and reshape if needed
-    frames = input_frames.cpu().numpy()
-    gt = gt_heatmap.cpu().numpy()
-    pred = pred_heatmap.cpu().numpy()
-    
-    # Reshape ground truth if it's flattened (921600 = 720 * 1280)
-    if len(gt.shape) == 1:
-        gt = gt.reshape(720, 1280)
-    elif len(gt.shape) == 2:
-        gt = gt[0].reshape(720, 1280)
-    
-    # Handle prediction shape
-    if len(pred.shape) == 3:
-        # Take the first batch and sum across channels
-        pred = pred[0].sum(axis=0).reshape(720, 1280)
-        # Normalize prediction
-        pred = (pred - pred.min()) / (pred.max() - pred.min() + 1e-8)
-    
-    # Create figure with subplots
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
-    
-    # Plot input frames
-    for i in range(3):
-        frame = np.transpose(frames[0, i*3:(i+1)*3], (1, 2, 0))  # Get single frame and convert to HWC
-        axes[0, i].imshow(frame)
-        axes[0, i].set_title(f'Input Frame {i+1}')
-        axes[0, i].axis('off')
-    
-    # Plot ground truth and predicted heatmaps with higher contrast
-    axes[1, 0].imshow(gt, cmap='hot', vmin=0, vmax=255)
-    axes[1, 0].set_title('Ground Truth Heatmap')
-    axes[1, 0].axis('off')
-    
-    axes[1, 1].imshow(pred, cmap='hot', vmin=0, vmax=1)
-    axes[1, 1].set_title('Predicted Heatmap')
-    axes[1, 1].axis('off')
-    
-    # Plot overlay of both heatmaps
-    overlay = np.zeros((*gt.shape, 3))
-    overlay[..., 0] = gt / 255.0  # Red channel for ground truth
-    overlay[..., 1] = pred  # Green channel for prediction
-    axes[1, 2].imshow(overlay)
-    axes[1, 2].set_title('Overlay (GT=Red, Pred=Green)')
-    axes[1, 2].axis('off')
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path)
-    plt.close()
+    for frame_idx in range(min(num_frames, len(input_frames))):
+        # Create figure with subplots
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        
+        # Get current frame
+        frame = input_frames[frame_idx].cpu().numpy()
+        if frame.shape[0] == 9:  # If we have 3 concatenated RGB frames
+            frame = frame[0:3]  # Take only the first frame
+        frame = np.transpose(frame, (1, 2, 0))  # CHW to HWH
+        
+        # Get ground truth and prediction for current frame
+        gt = gt_heatmap[frame_idx].cpu().numpy()
+        pred = pred_heatmap[frame_idx].cpu().numpy()
+        
+        # Reshape ground truth if it's flattened (921600 = 720 * 1280)
+        if len(gt.shape) == 1:
+            gt = gt.reshape(720, 1280)
+        
+        # Handle prediction shape
+        if len(pred.shape) == 1:
+            pred = pred.reshape(720, 1280)
+        
+        # Plot the three images
+        axes[0].imshow(frame)
+        axes[0].set_title(f'Frame {frame_idx}')
+        axes[0].axis('off')
+        
+        axes[1].imshow(gt, cmap='hot')
+        axes[1].set_title('Ground Truth')
+        axes[1].axis('off')
+        
+        axes[2].imshow(pred, cmap='hot')
+        axes[2].set_title('Prediction')
+        axes[2].axis('off')
+        
+        plt.tight_layout()
+        
+        # Save if path is provided
+        if save_path:
+            frame_save_path = save_path.replace('.png', f'_frame{frame_idx}.png')
+            plt.savefig(frame_save_path)
+        plt.close()
 
 def validate(model, val_loader, device, epoch):
-    losses = []
-    tp = [0, 0, 0]
-    fp = [0, 0, 0]
-    tn = [0, 0, 0]
-    fn = [0, 0, 0]
-    criterion = nn.CrossEntropyLoss()
     model.eval()
-    
-    # Create directory for validation visualizations
-    vis_dir = f'validation_vis_epoch_{epoch}'
-    os.makedirs(vis_dir, exist_ok=True)
+    losses = []
+    criterion = nn.CrossEntropyLoss()
+    tp = [0]*3
+    tn = [0]*3
+    fp = [0]*3
+    fn = [0]*3
     
     with torch.no_grad():
         for iter_id, batch in enumerate(val_loader):
-            inputs = batch[0].float().to(device)
-            # Convert ground truth to proper type and shape
-            gt = batch[1].long().to(device)  # Changed from byte to long
+            out = model(batch[0].float().to(device))
+            gt = torch.tensor(batch[1], dtype=torch.long, device=device)
+            loss = criterion(out, gt)
+            losses.append(loss.item())
             
-            # Forward pass
-            out = model(inputs)
-            
-            # Save visualization every 50 iterations
-            if iter_id % 50 == 0:
-                save_path = os.path.join(vis_dir, f'val_iter_{iter_id}.png')
-                visualize_heatmaps(inputs, gt, out, save_path)
+            # Save first batch visualization
+            if iter_id == 0:
+                save_path = f'validation_vis_epoch_{epoch}.png'
+                visualize_heatmaps(batch[0], batch[1], out, save_path, num_frames=10)
             
             # Ensure shapes are correct for loss calculation
             if out.dim() == 3:  # If output is [batch, channels, pixels]
@@ -120,13 +107,9 @@ def validate(model, val_loader, device, epoch):
             if gt.dim() == 1:  # If ground truth is [pixels]
                 gt = gt.view(-1)  # Reshape to [batch*height*width]
             
-            loss = criterion(out, gt)
-            losses.append(loss.item())
-            
-            # Get predictions
+            # Calculate metrics
             pred = torch.argmax(out, dim=1)
             
-            # Calculate metrics
             for i in range(len(pred)):
                 x_pred, y_pred = postprocess(pred[i])
                 x_gt = batch[2][i]
@@ -147,7 +130,7 @@ def validate(model, val_loader, device, epoch):
                         fn[vis] += 1
                     else:
                         tn[vis] += 1
-                        
+            
             print('val | epoch = {}, iter = [{}|{}], loss = {}, tp = {}, tn = {}, fp = {}, fn = {} '.format(
                 epoch, iter_id, len(val_loader), round(np.mean(losses), 6), sum(tp), sum(tn), sum(fp), sum(fn)))
     
