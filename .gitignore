@@ -3161,3 +3161,4 @@ datasets/trackNet/handball/game1/Clip5/Label.csv
 *.jpg
 *.csv
 output.avi
+clip4_trainset.avi
