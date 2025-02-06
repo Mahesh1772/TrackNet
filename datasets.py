@@ -91,33 +91,70 @@ class trackNetDataset(Dataset):
         # Create ground truth heatmap
         heatmap = np.zeros((self.height, self.width), dtype=np.float32)
         
-        # Only create Gaussian blob for visible balls
+        # Only create Gaussian blobs for visible balls
         if visibility_class > 0 and not np.isnan(x) and not np.isnan(y):
-            # Scale coordinates to match resized dimensions
+            # Current position (strongest)
             x_scaled = int(x * self.width / 1280)
             y_scaled = int(y * self.height / 720)
             
-            # Create Gaussian blob with larger size and spread
-            sigma = 10  # Increased from 2.5 to 10
-            size = 30   # Increased from 15 to 30
-            x_grid, y_grid = np.meshgrid(
-                np.arange(max(0, x_scaled - size), min(self.width, x_scaled + size + 1)) - x_scaled,
-                np.arange(max(0, y_scaled - size), min(self.height, y_scaled + size + 1)) - y_scaled
-            )
-            gaussian = np.exp(-(x_grid**2 + y_grid**2)/(2*sigma**2))
+            # Get previous positions
+            positions = []
+            for i in range(3):  # Only look at last 3 frames for more consistent trails
+                curr_idx = idx - i
+                if curr_idx >= 0:
+                    curr_row = self.data.iloc[curr_idx]
+                    curr_x, curr_y = curr_row['X'], curr_row['Y']
+                    curr_vis = curr_row['Visibility Class']
+                    
+                    if curr_vis > 0 and not np.isnan(curr_x) and not np.isnan(curr_y):
+                        x_curr = int(curr_x * self.width / 1280)
+                        y_curr = int(curr_y * self.height / 720)
+                        positions.append((x_curr, y_curr))
             
-            # Place Gaussian on heatmap
-            y_start = max(0, y_scaled - size)
-            y_end = min(self.height, y_scaled + size + 1)
-            x_start = max(0, x_scaled - size)
-            x_end = min(self.width, x_scaled + size + 1)
-            
-            heatmap[y_start:y_end, x_start:x_end] = gaussian
+            # Create trail with interpolation
+            if len(positions) > 1:
+                # Add main ball position
+                self._add_gaussian(heatmap, positions[0][0], positions[0][1], sigma=10, size=30, intensity=1.0)
+                
+                # Add interpolated trail
+                for i in range(len(positions)-1):
+                    x1, y1 = positions[i]
+                    x2, y2 = positions[i+1]
+                    
+                    # Interpolate points between positions
+                    steps = 3  # Reduced number of interpolation points
+                    for step in range(steps):
+                        t = step / steps
+                        x = int(x1 * (1-t) + x2 * t)
+                        y = int(y1 * (1-t) + y2 * t)
+                        
+                        # Make trail more subtle
+                        intensity = 0.3 * (1 - (i + t/steps) / len(positions))  # Reduced base intensity from 0.7 to 0.3
+                        self._add_gaussian(heatmap, x, y, sigma=6, size=20, intensity=intensity)  # Smaller Gaussian for trail
+            else:
+                # If no valid previous positions, just show current position
+                self._add_gaussian(heatmap, x_scaled, y_scaled, sigma=10, size=30, intensity=1.0)
         
-        # Don't threshold the Gaussian - keep the continuous values
         heatmap = heatmap.reshape(-1)  # Flatten to 1D array
-        
         return imgs, heatmap, x, y, visibility_class
+    
+    def _add_gaussian(self, heatmap, x_center, y_center, sigma=10, size=30, intensity=1.0):
+        """Helper function to add a Gaussian blob to the heatmap"""
+        x_grid, y_grid = np.meshgrid(
+            np.arange(max(0, x_center - size), min(self.width, x_center + size + 1)) - x_center,
+            np.arange(max(0, y_center - size), min(self.height, y_center + size + 1)) - y_center
+        )
+        gaussian = np.exp(-(x_grid**2 + y_grid**2)/(2*sigma**2)) * intensity
+        
+        y_start = max(0, y_center - size)
+        y_end = min(self.height, y_center + size + 1)
+        x_start = max(0, x_center - size)
+        x_end = min(self.width, x_center + size + 1)
+        
+        heatmap[y_start:y_end, x_start:x_end] = np.maximum(
+            heatmap[y_start:y_end, x_start:x_end],
+            gaussian
+        )
     
     def get_output(self, path_gt):
         img = cv2.imread(path_gt)
