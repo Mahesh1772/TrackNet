@@ -28,6 +28,8 @@ class TrajectoryLabeler:
             frame_path = os.path.join(self.clip_path, f'{self.current_frame:04d}.jpg')
             if not os.path.exists(frame_path):
                 print("Reached the end of frames. Auto-saving progress.")
+                # Clean up data before saving - set empty string for VC=0 rows
+                self.df.loc[self.df['Visibility Class'] == 0, ['X', 'Y', 'Trajectory Pattern']] = ''
                 self.df.to_csv(self.csv_path, index=False)  # Auto-save on reaching the end
                 break
                 
@@ -42,9 +44,13 @@ class TrajectoryLabeler:
             key = cv2.waitKey(0)
             
             if key == ord('q'):  # Quit
+                # Clean up data before saving
+                self.df.loc[self.df['Visibility Class'] == 0, ['X', 'Y', 'Trajectory Pattern']] = ''
                 self.df.to_csv(self.csv_path, index=False)  # Save on quit
                 break
             elif key == ord('s'):  # Save
+                # Clean up data before saving
+                self.df.loc[self.df['Visibility Class'] == 0, ['X', 'Y', 'Trajectory Pattern']] = ''
                 self.df.to_csv(self.csv_path, index=False)
                 print("Progress saved!")
                 print(self.df)  # Print the entire DataFrame
@@ -54,11 +60,15 @@ class TrajectoryLabeler:
                 self.current_frame = max(0, self.current_frame - 1)
             elif key in [ord('0'), ord('1'), ord('2')]:  # Set Trajectory Pattern
                 traj_value = int(chr(key))
-                self.df.at[self.current_frame, 'Trajectory Pattern'] = traj_value
-                print(f"Trajectory Pattern set to {traj_value} - " + 
-                      ("Free Flight" if traj_value == 0 else 
-                       "In Possession" if traj_value == 1 else 
-                       "Bounce/Roll"))
+                # Only set trajectory value if VC > 0
+                if self.df.at[self.current_frame, 'Visibility Class'] > 0:
+                    self.df.at[self.current_frame, 'Trajectory Pattern'] = traj_value
+                    print(f"Trajectory Pattern set to {traj_value} - " + 
+                          ("Free Flight" if traj_value == 0 else 
+                           "In Possession" if traj_value == 1 else 
+                           "Bounce/Roll"))
+                else:
+                    print("Cannot set Trajectory Pattern when Visibility Class is 0")
     
     def display_frame(self):
         """Display current frame with ball position and trajectory value"""
@@ -87,7 +97,7 @@ class TrajectoryLabeler:
 
 def main():
     # Path to the clip you want to label
-    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip5'
+    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip1'
     
     labeler = TrajectoryLabeler(clip_path)
 
