@@ -80,14 +80,27 @@ def visualize_heatmaps(input_frames, gt_heatmap, pred_heatmap, save_path=None, n
             plt.savefig(frame_save_path)
         plt.close()
 
+
+
+
+
+
+
+
+
 def validate(model, val_loader, device, epoch):
     model.eval()
     losses = []
+
+
+
+
     criterion = nn.CrossEntropyLoss()
     tp = [0]*3
     tn = [0]*3
     fp = [0]*3
     fn = [0]*3
+
     
     with torch.no_grad():
         for iter_id, batch in enumerate(val_loader):
@@ -95,6 +108,8 @@ def validate(model, val_loader, device, epoch):
             gt = torch.tensor(batch[1], dtype=torch.long, device=device)
             loss = criterion(out, gt)
             losses.append(loss.item())
+
+
             
             # Save first batch visualization
             if iter_id == 0:
@@ -108,8 +123,12 @@ def validate(model, val_loader, device, epoch):
                 gt = gt.view(-1)  # Reshape to [batch*height*width]
             
             # Calculate metrics
+
+
+
             pred = torch.argmax(out, dim=1)
             
+
             for i in range(len(pred)):
                 x_pred, y_pred = postprocess(pred[i])
                 x_gt = batch[2][i]
@@ -181,6 +200,3 @@ def postprocess(feature_map):
             x, y = circles[0][0], circles[0][1]
     
     return x, y
-
-
-

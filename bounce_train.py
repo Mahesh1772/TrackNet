@@ -31,13 +31,14 @@ def create_features(path_dataset, num_frames):
                 labels['x_div_{}'.format(i)] = abs(labels['x_diff_{}'.format(i)]/(labels['x_diff_inv_{}'.format(i)] + eps))
                 labels['y_div_{}'.format(i)] = labels['y_diff_{}'.format(i)]/(labels['y_diff_inv_{}'.format(i)] + eps)
 
-            labels['target'] = (labels['status'] == 2).astype(int)         
+            labels['target'] = (labels['vc'] > 0).astype(int)
+            
             for i in range(1, num_frames):    
                 labels = labels[labels['x_lag_{}'.format(i)].notna()]
                 labels = labels[labels['x_lag_inv_{}'.format(i)].notna()]
             labels = labels[labels['x-coordinate'].notna()]  
 
-            labels['status'] = labels['status'].astype(int)
+            labels['status'] = labels['vc'].astype(int)
             df = df.append(labels)
     return df
 

@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', type=int, default=2, help='total training epochs') #number of epochs = 300
     parser.add_argument('--lr', type=float, default=0.8, help='learning rate')
     parser.add_argument('--val_intervals', type=int, default=1, help='number of epochs to run validation') #number of epochs to run validation = 5
-    parser.add_argument('--steps_per_epoch', type=int, default=10, help='number of steps per one epoch') #iterations per epoch = 200
+    parser.add_argument('--steps_per_epoch', type=int, default=1, help='number of steps per one epoch') #iterations per epoch = 200
     args = parser.parse_args()
     
 
@@ -27,6 +27,21 @@ if __name__ == '__main__':
         num_workers=1,
         pin_memory=True
     )
+    
+    # Add this code to check class balance
+    total_samples = len(train_dataset)
+    visible_balls = (train_dataset.data['Visibility Class'] > 0).sum()
+    no_balls = (train_dataset.data['Visibility Class'] == 0).sum()
+    partially_visible = (train_dataset.data['Visibility Class'] == 2).sum()
+    fully_visible = (train_dataset.data['Visibility Class'] == 1).sum()
+
+    print("\nClass Distribution in Training Set:")
+    print(f"Total samples: {total_samples}")
+    print(f"No balls (VC=0): {no_balls} ({no_balls/total_samples*100:.2f}%)")
+    print(f"Fully visible (VC=1): {fully_visible} ({fully_visible/total_samples*100:.2f}%)")
+    print(f"Partially visible (VC=2): {partially_visible} ({partially_visible/total_samples*100:.2f}%)")
+    print(f"Total visible (VC>0): {visible_balls} ({visible_balls/total_samples*100:.2f}%)")
+    print("-" * 50)
     
     val_dataset = trackNetDataset('val')
     val_loader = torch.utils.data.DataLoader(
