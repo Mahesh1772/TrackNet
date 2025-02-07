@@ -100,7 +100,7 @@ class BallLabeler:
 
 def main():
     # Path to the clip you want to label
-    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip1'
+    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip11'
 
     labeler = BallLabeler(clip_path)
 

@@ -70,8 +70,8 @@ class VCLabeler:
         x = self.df.at[self.current_frame, 'X']
         y = self.df.at[self.current_frame, 'Y']
         if pd.notna(x) and pd.notna(y):
-            # Draw a red circle at ball position
-            cv2.circle(img_copy, (int(x), int(y)), 5, (0, 0, 255), -1)
+            # Draw a red circle at ball position2
+            cv2.circle(img_copy, (int(x), int(y)), 2, (0, 0, 255), -1)
             # Display coordinates
             cv2.putText(img_copy, f'Ball: ({int(x)},{int(y)})', (10, 60),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
@@ -80,7 +80,7 @@ class VCLabeler:
 
 def main():
     # Path to the clip you want to label
-    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip1'
+    clip_path = r'C:\Users\Admin\Documents\Personal_Tracknet\datasets\handball\game1\Clip11'
     
     labeler = VCLabeler(clip_path)
 

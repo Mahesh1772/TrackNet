@@ -80,27 +80,17 @@ def visualize_heatmaps(input_frames, gt_heatmap, pred_heatmap, save_path=None, n
             plt.savefig(frame_save_path)
         plt.close()
 
-
-
-
-
-
-
-
-
 def validate(model, val_loader, device, epoch):
     model.eval()
     losses = []
-
-
-
-
     criterion = nn.CrossEntropyLoss()
     tp = [0]*3
     tn = [0]*3
     fp = [0]*3
     fn = [0]*3
-
+    
+    output_dir = 'validation_outputs'
+    os.makedirs(output_dir, exist_ok=True)
     
     with torch.no_grad():
         for iter_id, batch in enumerate(val_loader):
@@ -108,14 +98,30 @@ def validate(model, val_loader, device, epoch):
             gt = torch.tensor(batch[1], dtype=torch.long, device=device)
             loss = criterion(out, gt)
             losses.append(loss.item())
-
-
             
             # Save first batch visualization
             if iter_id == 0:
                 save_path = f'validation_vis_epoch_{epoch}.png'
                 visualize_heatmaps(batch[0], batch[1], out, save_path, num_frames=10)
-            
+                
+                # Save tensors
+                tensor_save_path = os.path.join(output_dir, f'tensors_epoch_{epoch}.txt')
+                with open(tensor_save_path, 'w') as f:
+                    f.write("Ground Truth Tensor:\n")
+                    f.write(str(gt.cpu().numpy()))
+                    f.write("\n\nPrediction Tensor:\n")
+                    f.write(str(out.cpu().numpy()))
+                    
+                # Optional: Save in a more readable format
+                readable_save_path = os.path.join(output_dir, f'readable_tensors_epoch_{epoch}.txt')
+                with open(readable_save_path, 'w') as f:
+                    f.write("Ground Truth Tensor Shape: {}\n".format(gt.shape))
+                    f.write("Ground Truth Values:\n")
+                    np.savetxt(f, gt.cpu().numpy(), fmt='%.4f')
+                    f.write("\nPrediction Tensor Shape: {}\n".format(out.shape))
+                    f.write("Prediction Values:\n")
+                    np.savetxt(f, out.cpu().numpy().reshape(out.shape[0], -1), fmt='%.4f')
+
             # Ensure shapes are correct for loss calculation
             if out.dim() == 3:  # If output is [batch, channels, pixels]
                 out = out.view(out.size(0), out.size(1), -1)  # Reshape to [batch, channels, height*width]
@@ -123,12 +129,8 @@ def validate(model, val_loader, device, epoch):
                 gt = gt.view(-1)  # Reshape to [batch*height*width]
             
             # Calculate metrics
-
-
-
             pred = torch.argmax(out, dim=1)
             
-
             for i in range(len(pred)):
                 x_pred, y_pred = postprocess(pred[i])
                 x_gt = batch[2][i]
@@ -165,7 +167,6 @@ def validate(model, val_loader, device, epoch):
     print('f1 = {}'.format(f1))
     
     return np.mean(losses), precision, recall, f1
-
 
 def postprocess(feature_map):
     """Process network output to get ball coordinates"""
