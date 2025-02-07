@@ -173,25 +173,30 @@ def postprocess(feature_map):
     if isinstance(feature_map, torch.Tensor):
         feature_map = feature_map.cpu().detach().numpy()
     
-    # Print shape for debugging
-    #print(f"Feature map shape: {feature_map.shape}")
-    
     # Reshape based on the actual dimensions
     if len(feature_map.shape) == 1:
-        # If it's a 1D array, calculate height and width
         total_size = feature_map.shape[0]
         height = int(np.sqrt(total_size))
         width = total_size // height
         feature_map = feature_map.reshape((height, width))
     elif len(feature_map.shape) == 3:
-        # If it's 3D (channels, height, width), take the first channel
-        feature_map = feature_map[0]
+        feature_map = feature_map[0]  # Take first channel
     
-    # Convert to uint8 for cv2
-    feature_map = ((feature_map - feature_map.min()) * (255 / (feature_map.max() - feature_map.min()))).astype(np.uint8)
+    # Add safety checks for normalization
+    f_min = feature_map.min()
+    f_max = feature_map.max()
+    if f_max - f_min > 1e-10:  # Check if range is non-zero
+        feature_map = ((feature_map - f_min) * (255 / (f_max - f_min)))
+    else:
+        feature_map = np.zeros_like(feature_map)
+    feature_map = feature_map.astype(np.uint8)
+    
+    # Print some debug info
+    print(f"Feature map range: {f_min:.4f} to {f_max:.4f}")
+    print(f"Unique values in processed map: {np.unique(feature_map)}")
     
     # Find ball position
-    x, y = -1, -1  # Default values if no ball is found
+    x, y = None, None  # Default values if no ball is found
     circles = cv2.HoughCircles(feature_map, cv2.HOUGH_GRADIENT, dp=1, minDist=1,
                              param1=50, param2=2, minRadius=2, maxRadius=7)
     

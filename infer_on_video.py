@@ -38,77 +38,89 @@ def infer_model(frames, model):
         ball_track: list of detected ball points
         dists: list of euclidean distances between two neighbouring ball points
     """
-    height = 360
-    width = 640
+    height = 720  # Match your training resolution
+    width = 1280
     dists = [-1]*2
     ball_track = [(None,None)]*2
-    for num in tqdm(range(2, len(frames))):
-        img = cv2.resize(frames[num], (width, height))
-        img_prev = cv2.resize(frames[num-1], (width, height))
-        img_preprev = cv2.resize(frames[num-2], (width, height))
-        imgs = np.concatenate((img, img_prev, img_preprev), axis=2)
-        imgs = imgs.astype(np.float32)/255.0
-        imgs = np.rollaxis(imgs, 2, 0)
-        inp = np.expand_dims(imgs, axis=0)
+    
+    model.eval()  # Ensure model is in eval mode
+    with torch.no_grad():  # Add this for inference
+        for num in tqdm(range(2, len(frames))):
+            img = cv2.resize(frames[num], (width, height))
+            img_prev = cv2.resize(frames[num-1], (width, height))
+            img_preprev = cv2.resize(frames[num-2], (width, height))
+            imgs = np.concatenate((img, img_prev, img_preprev), axis=2)
+            imgs = imgs.astype(np.float32)/255.0
+            imgs = np.rollaxis(imgs, 2, 0)
+            inp = np.expand_dims(imgs, axis=0)
 
-        out = model(torch.from_numpy(inp).float().to(device))
-        output = out.argmax(dim=1).detach().cpu().numpy()
-        x_pred, y_pred = postprocess(output)
-        ball_track.append((x_pred, y_pred))
+            out = model(torch.from_numpy(inp).float().to(device), testing=True)  # Add testing=True
+            output = out.argmax(dim=1).detach().cpu().numpy()
+            
+            # Add debug print
+            print(f"Output shape: {output.shape}, range: {output.min():.4f} to {output.max():.4f}")
+            
+            x_pred, y_pred = postprocess(output[0])  # Process first item in batch
+            ball_track.append((x_pred, y_pred))
 
-        if ball_track[-1][0] and ball_track[-2][0]:
-            dist = distance.euclidean(ball_track[-1], ball_track[-2])
-        else:
-            dist = -1
-        dists.append(dist)  
+            if ball_track[-1][0] and ball_track[-2][0]:
+                dist = distance.euclidean(ball_track[-1], ball_track[-2])
+            else:
+                dist = -1
+            dists.append(dist)
     return ball_track, dists 
 
-def remove_outliers(ball_track, dists, max_dist = 100):
+def remove_outliers(positions, dists, max_dist=50):
     """ Remove outliers from model prediction    
     :params
-        ball_track: list of detected ball points
+        positions: list of detected ball points
         dists: list of euclidean distances between two neighbouring ball points
         max_dist: maximum distance between two neighbouring ball points
     :return
-        ball_track: list of ball points
+        positions: list of ball points
     """
-    outliers = list(np.where(np.array(dists) > max_dist)[0])
-    for i in outliers:
-        if (dists[i+1] > max_dist) | (dists[i+1] == -1):       
-            ball_track[i] = (None, None)
-            outliers.remove(i)
-        elif dists[i-1] == -1:
-            ball_track[i-1] = (None, None)
-    return ball_track  
+    for i in range(len(positions)-1):  # Changed from len(positions)
+        if (dists[i] > max_dist) | (dists[i] == -1):
+            positions[i] = None
+            
+    # Handle the last position separately if needed
+    if len(positions) > 0:
+        if dists[-1] > max_dist or dists[-1] == -1:
+            positions[-1] = None
+            
+    return positions
 
-def split_track(ball_track, max_gap=4, max_dist_gap=80, min_track=5):
-    """ Split ball track into several subtracks in each of which we will perform
-    ball interpolation.    
-    :params
-        ball_track: list of detected ball points
-        max_gap: maximun number of coherent None values for interpolation  
-        max_dist_gap: maximum distance at which neighboring points remain in one subtrack
-        min_track: minimum number of frames in each subtrack    
-    :return
-        result: list of subtrack indexes    
-    """
-    list_det = [0 if x[0] else 1 for x in ball_track]
-    groups = [(k, sum(1 for _ in g)) for k, g in groupby(list_det)]
-
-    cursor = 0
-    min_value = 0
-    result = []
-    for i, (k, l) in enumerate(groups):
-        if (k == 1) & (i > 0) & (i < len(groups) - 1):
-            dist = distance.euclidean(ball_track[cursor-1], ball_track[cursor+l])
-            if (l >=max_gap) | (dist/l > max_dist_gap):
-                if cursor - min_value > min_track:
-                    result.append([min_value, cursor])
-                    min_value = cursor + l - 1        
-        cursor += l
-    if len(list_det) - min_value > min_track: 
-        result.append([min_value, len(list_det)]) 
-    return result    
+def split_track(ball_track):
+    # Create list marking frames with detections (0) and without detections (1)
+    list_det = [0 if x is not None else 1 for x in ball_track]
+    
+    # Find sequences of consecutive frames without detections
+    gaps = []
+    start = None
+    for i, val in enumerate(list_det):
+        if val == 1 and start is None:
+            start = i
+        elif val == 0 and start is not None:
+            gaps.append((start, i-1))
+            start = None
+    if start is not None:
+        gaps.append((start, len(list_det)-1))
+    
+    # Split track into subtracks based on gaps
+    subtracks = []
+    last_end = 0
+    for gap_start, gap_end in gaps:
+        if gap_start - last_end > 1:  # If there are detections before gap
+            subtrack = ball_track[last_end:gap_start]
+            subtracks.append((last_end, gap_start))  # Store indices instead of actual subtrack
+        last_end = gap_end + 1
+    
+    # Add final subtrack if there are detections after last gap
+    if last_end < len(ball_track):
+        if any(x is not None for x in ball_track[last_end:]):  # Only add if contains detections
+            subtracks.append((last_end, len(ball_track)))
+            
+    return subtracks
 
 def interpolation(coords):
     """ Run ball interpolation in one subtrack    
@@ -126,35 +138,42 @@ def interpolation(coords):
     nons, yy = nan_helper(x)
     x[nons]= np.interp(yy(nons), yy(~nons), x[~nons])
     nans, xx = nan_helper(y)
-    y[nans]= np.interp(xx(nans), xx(~nans), y[~nans])
+    y[nans]= np.interp(xx(nans), xx(~nons), y[~nons])
 
     track = [*zip(x,y)]
     return track
 
-def write_track(frames, ball_track, path_output_video, fps, trace=7):
-    """ Write .avi file with detected ball tracks
+def write_track(frames, ball_track, path_video_out, fps):
+    """ Write output video with visualized ball track
     :params
-        frames: list of original video frames
-        ball_track: list of ball coordinates
-        path_output_video: path to output video
+        frames: list of video frames
+        ball_track: list of detected ball points
+        path_video_out: path to output video file
         fps: frames per second
-        trace: number of frames with detected trace
     """
-    height, width = frames[0].shape[:2]
-    out = cv2.VideoWriter(path_output_video, cv2.VideoWriter_fourcc(*'DIVX'), 
-                          fps, (width, height))
-    for num in range(len(frames)):
-        frame = frames[num]
-        for i in range(trace):
-            if (num-i > 0):
-                if ball_track[num-i][0]:
-                    x = int(ball_track[num-i][0])
-                    y = int(ball_track[num-i][1])
-                    frame = cv2.circle(frame, (x,y), radius=0, color=(0, 0, 255), thickness=10-i)
-                else:
-                    break
-        out.write(frame) 
-    out.release()    
+    height = frames[0].shape[0]
+    width = frames[0].shape[1]
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(path_video_out, fourcc, fps, (width, height))
+    
+    for num, frame in enumerate(frames):
+        # Draw current position
+        if ball_track[num] is not None:  # Check if detection exists
+            x, y = ball_track[num]
+            if x is not None and y is not None:  # Check if coordinates exist
+                cv2.circle(frame, (int(x), int(y)), 5, (0,0,255), -1)
+        
+        # Draw track for previous 10 frames
+        for i in range(1, 11):
+            if num-i >= 0:  # Check if previous frame exists
+                if ball_track[num-i] is not None:  # Check if detection exists
+                    x, y = ball_track[num-i]
+                    if x is not None and y is not None:  # Check if coordinates exist
+                        cv2.circle(frame, (int(x), int(y)), 2, (0,0,255), -1)
+        
+        out.write(frame)
+    
+    out.release()
 
 if __name__ == '__main__':
     
@@ -172,16 +191,20 @@ if __name__ == '__main__':
     model = model.to(device)
     model.eval()
     
+    # After loading model
+    print("Model loaded successfully")
+    print(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
+    
     frames, fps = read_video(args.video_path)
     ball_track, dists = infer_model(frames, model)
     ball_track = remove_outliers(ball_track, dists)    
     
     if args.extrapolation:
-        subtracks = split_track(ball_track)
-        for r in subtracks:
-            ball_subtrack = ball_track[r[0]:r[1]]
+        ranges = split_track(ball_track)
+        for start, end in ranges:  # Unpack the tuple directly
+            ball_subtrack = ball_track[start:end]
             ball_subtrack = interpolation(ball_subtrack)
-            ball_track[r[0]:r[1]] = ball_subtrack
+            ball_track[start:end] = ball_subtrack
         
     write_track(frames, ball_track, args.video_out_path, fps)    
     
